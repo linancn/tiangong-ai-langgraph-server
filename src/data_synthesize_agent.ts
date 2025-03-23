@@ -9,9 +9,6 @@ const openai_api_key = process.env.OPENAI_API_KEY ?? '';
 
 // Supabase
 const base_url = process.env.BASE_URL ?? '';
-const supabase_email = process.env.EMAIL ?? '';
-const supabase_password = process.env.PASSWORD ?? '';
-const supabase_authorization = process.env.SUPABASE_ANON_KEY ?? '';
 
 const chainState = Annotation.Root({
   input: Annotation<string>(),
@@ -20,15 +17,17 @@ const chainState = Annotation.Root({
   chunk_analysis: Annotation<string[]>({
     reducer: (x, y) => x.concat(y),
   }),
+  supabase_email: Annotation<string>(),
+  supabase_password: Annotation<string>(),
+  supabase_authorization: Annotation<string>(),
 });
 
 async function searchTextbooks(state: typeof chainState.State) {
-  console.log('---    PROCESS: SEARCH TEXTBOOKS    ---');
   const url = `${base_url}/textbook_search`;
   const headers = {
-    email: supabase_email,
-    password: supabase_password,
-    Authorization: `Bearer ${supabase_authorization}`,
+    email: state.supabase_email,
+    password: state.supabase_password,
+    Authorization: `Bearer ${state.supabase_authorization}`,
     'Content-Type': 'application/json',
   };
 
@@ -43,7 +42,6 @@ async function searchTextbooks(state: typeof chainState.State) {
 }
 
 async function routeChunks(state: typeof chainState.State): Promise<Send[]> {
-  console.log('---    PROCESS: ROUTE CHUNKS    ---');
   return state.textbook_chunks.map((chunk: { content: string; source: string }) => {
     return new Send('analyzeChunk', {
       chunk_content: chunk.content,
@@ -52,7 +50,6 @@ async function routeChunks(state: typeof chainState.State): Promise<Send[]> {
 }
 
 async function analyzeChunk(state: typeof chainState.State) {
-  // console.log('---    PROCESS: ANALYZE CHUNK    ---');
   const responseSchema = z.object({
     analysis: z.array(
       z.object({
