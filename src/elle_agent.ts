@@ -173,7 +173,7 @@ async function evaluateAnswer(state: typeof StateAnnotation.State) {
   const response = await structuredLlm.invoke([
     {
       role: 'human',
-      content: `Please evaluate the responses to the following question, focusing on logical coherence and whether it provides clear and reasonable results, and provide suggestion on logic thinking to improve the quality of the response. The evaluation criteria are:\n\n
+      content: `Please evaluate the responses to the following question, focusing on logical coherence and whether it provides clear and reasonable results, and provide suggestion concerning evaluation criteria to improve the quality of the response. The evaluation criteria are:\n\n
       Criteria: ${evaluationCriteria}.
       Question: ${firstMessage.content}.
       Response: ${answer}.`,
