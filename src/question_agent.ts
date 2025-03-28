@@ -60,7 +60,7 @@ async function routeSimpleQustions(state: typeof chainState.State): Promise<Send
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
-      remarks: state.descriptions,
+      descriptions: state.descriptions,
       graphData: state.graphData,
     });
   });
@@ -71,7 +71,7 @@ async function routeMediumQustions(state: typeof chainState.State): Promise<Send
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
-      remarks: state.descriptions,
+      descriptions: state.descriptions,
       graphData: state.graphData,
     });
   });
@@ -82,7 +82,7 @@ async function routeHardQustions(state: typeof chainState.State): Promise<Send[]
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
-      remarks: state.descriptions,
+      descriptions: state.descriptions,
       graphData: state.graphData,
     });
   });
@@ -98,15 +98,8 @@ async function SingeChoice(state: typeof chainState.State) {
       }),
     ),
     Answer: z.array(z.enum(['A', 'B', 'C', 'D'])).describe('One correct answer to this question'),
-    difficulty: z
-      .number()
-      .min(1)
-      .max(5)
-      .describe('difficulty level of the question, 1 means easy, 5 means hard'),
+    difficulty: z.number().describe('difficulty level of the question, 1 means easy, 5 means hard'),
     Remark: z.string().describe('explanation of the answer'),
-    Type: z.literal('SingleChoice').default('SingleChoice'),
-    TypeText: z.literal('单选题').default('单选题'),
-    ProblemType: z.literal(1).default(1),
   });
 
   const model = new ChatOpenAI({
@@ -140,7 +133,15 @@ Neo4j query results: ${state.graphData}
 `,
     },
   ]);
-  return { questions: response };
+
+  const enrichedResponse = {
+    ...response,
+    Type: 'SingleChoice',
+    TypeText: '单选题',
+    ProblemType: 1,
+  };
+
+  return { questions: enrichedResponse };
 }
 
 async function MultipleChoices(state: typeof chainState.State) {
@@ -155,15 +156,8 @@ async function MultipleChoices(state: typeof chainState.State) {
     Answer: z
       .array(z.enum(['A', 'B', 'C', 'D']))
       .describe('A set of correct answers to this question'),
-    difficulty: z
-      .number()
-      .min(1)
-      .max(5)
-      .describe('difficulty level of the question, 1 means easy, 5 means hard'),
+    difficulty: z.number().describe('difficulty level of the question, 1 means easy, 5 means hard'),
     Remark: z.string().describe('explanation of the answer'),
-    Type: z.literal('MultipleChoice').default('MultipleChoice'),
-    TypeText: z.literal('多选题').default('多选题'),
-    ProblemType: z.literal(2).default(2),
   });
 
   const model = new ChatOpenAI({
@@ -197,21 +191,24 @@ Neo4j query results: ${state.graphData}
 `,
     },
   ]);
-  return { questions: response };
+
+  const enrichedResponse = {
+    ...response,
+    Type: 'MultipleChoice',
+    TypeText: '多选题',
+    ProblemType: 2,
+  };
+
+  return { questions: enrichedResponse };
 }
 
 async function ShortAnswer(state: typeof chainState.State) {
   const shortanswerSchema = z.object({
     Body: z.string().describe('Question body'),
-    difficulty: z
-      .number()
-      .min(1)
-      .max(5)
-      .describe('difficulty level of the question, 1 means easy, 5 means hard'),
-    Remark: z.string().describe('explanation of the answer'),
-    Type: z.literal('ShortAnswer').default('ShortAnswer'),
-    TypeText: z.literal('主观题').default('主观题'),
-    ProblemType: z.literal(5).default(5),
+    difficulty: z.number().describe('difficulty level of the question, 1 means easy, 5 means hard'),
+    Remark: z
+      .string()
+      .describe('explanation of the answer including key points needed for grading'),
   });
 
   const model = new ChatOpenAI({
@@ -234,7 +231,7 @@ async function ShortAnswer(state: typeof chainState.State) {
 ${state.descriptions !== '' ? `- Descriptions:  ${state.descriptions}` : ''}
 - Question body: The question should focus on core concepts or key facts that require the user to recall and apply the information.
 - Difficulty level: Assign a difficulty level to the question based on the complexity of the content. 1 and 2 mean easy, 3 means medium, 4 and 5 mean hard.
-- Explanation: Provide a clear and concise explanation of this question.
+- Explanation: Provide a clear and concise explanation of this question that includes the key points that should be present in a complete answer. List the specific elements that would constitute a correct and complete response.
 - Question clarity: The question should be clear and concise, ensuring students can easily understand what is being asked.
 - Knowledge alignment: Ensure that the content of the question and the options aligns with the knowledge extracted from the Neo4j database.
 
@@ -242,7 +239,15 @@ Neo4j query results: ${state.graphData}
 `,
     },
   ]);
-  return { questions: response };
+
+  const enrichedResponse = {
+    ...response,
+    Type: 'ShortAnswer',
+    TypeText: '主观题',
+    ProblemType: 5,
+  };
+
+  return { questions: enrichedResponse };
 }
 
 async function outputQuestions(state: typeof chainState.State) {
