@@ -11,7 +11,8 @@
     "esg_search_agent": "./src/esg_search_agent.ts:graph",
     "elle_agent": "./src/elle_agent.ts:graph",
     "question_agent": "./src/question_agent.ts:graph",
-    "data_synthesize_agent": "./src/data_synthesize_agent.ts:graph"
+    "data_synthesize_agent": "./src/data_synthesize_agent.ts:graph",
+    "learning_path_agent": "./src/learning_path_agent.ts:graph"
   },
   "env": ".env"
 }
