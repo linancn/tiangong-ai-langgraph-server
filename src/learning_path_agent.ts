@@ -28,7 +28,7 @@ type supabaseElement = {
 const chainState = Annotation.Root({
   content: Annotation<string>(),
   supabase_auth: Annotation<supabaseElement>(),
-  usrData: Annotation<userElement>(),
+  userData: Annotation<userElement>(),
   graphData: Annotation<string>(),
   refData: Annotation<string>(),
   portraitData: Annotation<string>(),
@@ -123,16 +123,16 @@ async function getPortrait(state: typeof chainState.State) {
   const response = await model.invoke([
     {
       role: 'assistant',
-      content: `你是一位专业的教育分析助手。你的任务是基于学生信息进行用户画像分析，概括学生的知识掌握情况以及学习关注点与需求，确保信息全面但简洁明了。`,
+      content: `你是一位专业的教育分析助手。你的任务是基于学生信息进行用户画像分析，概括学生的知识掌握情况以及学习关注点与需求（不需要给出建议），确保信息全面但简洁明了。`,
     },
     {
       role: 'human',
       content: `学生情况：
-      -年级（用于判断学习阶段和相应需求）：${state.usrData.grade}，
-      -之前专业：${state.usrData.major ?? '无'}（仅适用于硕士/博士生，否则为空），
-      -专业背景（用于评估其学科基础）：${state.usrData.major_background}，
-      -掌握程度（用于衡量知识熟练度）：${state.usrData.grasp_level}，
-      -过往提出的问题（用于分析其关注点和可能的知识盲区）：${state.usrData.history?.join(', ') ?? '无'}。`,
+      -年级（用于判断学习阶段和相应需求）：${state.userData.grade}，
+      -之前专业（仅适用于硕士/博士生，否则为空）：${state.userData.major ?? '无'}，
+      -专业背景（用于评估其学科基础）：${state.userData.major_background}，
+      -掌握程度（用于衡量知识熟练度）：${state.userData.grasp_level}，
+      -过往提出的问题（用于分析其关注点和可能的知识盲区）：${state.userData.history?.join(', ') ?? '无'}。`,
     },
   ]);
   return { portraitData: response.content };
@@ -171,7 +171,7 @@ async function getPath(state: typeof chainState.State) {
   });
 
   const pathResult = z.object({
-    path: z.array(z.string()).describe('知识点顺序学习列表，从初始知识点到最终知识点'),
+    path: z.string().describe('知识点顺序学习列表，从初始知识点到最终知识点,用->分隔'),
   });
 
   const structuredLlm = model.withStructuredOutput(pathResult);
@@ -179,14 +179,16 @@ async function getPath(state: typeof chainState.State) {
   const response = await structuredLlm.invoke([
     {
       role: 'assistant',
-      content: `你是一位专业的学习路径规划专家，你的任务是基于学生当前水平，生成最简可行学习路径，你需要：
-        1. 仔细分析学生提出的问题（${state.content ?? '无'}）和需求；
-        2. 结合提供的知识体系，理解知识点之间的逻辑关系和依赖关系；
-        3. 学习路径必须遵循以下要求：
-           -严格遵循知识点的逻辑依赖（A→B 表示必须掌握A才能学B）；
-           -知识点必须简介明了，避免冗长复杂的描述；
-           -路径必须是最简可行的学习路径，避免不必要的知识点；
-           -路径必须是线性序列（如：A→B→C，不能是A→B且A→C）。`,
+      content: `
+      你是一位专业的学习路径规划专家，你的任务是基于学生当前水平，生成最简可行的学习路径。请严格按照以下要求进行分析和输出：
+      1. 分析学习需求：结合学生的问题（${state.content ?? '无'}）及学习特点，明确需要掌握的关键知识点。 
+      2. 识别关键知识点：结合提供的知识体系，提炼最核心的知识点（如形成过程、生物与化学性质、资源化利用相关要点、必要的基础化学与材料科学知识等）。 
+      3. 构建线性学习路径： 
+      - 严格遵循知识点的逻辑依赖关系（A→B 表示必须先掌握A，才能理解B）。 
+      - 仅保留最核心的知识点，避免冗余，确保路径最短且最有效。 
+      - 输出格式必须为严格的线性序列，即 A→B→C→D，不能出现并列项（如 A→B 且 A→C）。 
+      - 知识点表述必须简洁明了，避免冗长的解释。
+      4. 输出格式：最终输出的学习路径应为知识点顺序学习列表，从初始知识点到最终知识点，用“->”分隔,示例：基础化学知识→矿物化学（硅酸盐及其活性成分）→ 煤矸石的形成→煤矸石的化学组分→煤矸石的活性因素→资源化利用方法->矿物回收->建筑材料应用。`,
     },
     {
       role: 'human',
@@ -197,7 +199,7 @@ async function getPath(state: typeof chainState.State) {
       content: `学生学习特点与需求:${state.portraitData ?? '无'}。`,
     },
   ]);
-  return { portraitData: response['path'] };
+  return { pathData: response['path'] };
 }
 
 const workflow = new StateGraph(chainState)
