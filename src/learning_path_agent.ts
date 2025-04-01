@@ -2,6 +2,7 @@ import { Neo4jGraph } from '@langchain/community/graphs/neo4j_graph';
 import { Annotation, StateGraph } from '@langchain/langgraph';
 import { ChatOpenAI } from '@langchain/openai';
 import axios from 'axios';
+import neo4j from 'neo4j-driver';
 import { z } from 'zod';
 
 // OpenAI
@@ -51,11 +52,14 @@ async function getGraph(state: typeof chainState.State) {
     WHERE n.id = node.id
     OPTIONAL MATCH p2 = (m)-[*1..3]-()-[]-()
     WHERE m.id = node.id
-    RETURN COALESCE(p1, p2, '') AS result LIMIT 300
+    RETURN COALESCE(p1, p2, '') AS result LIMIT 200
     `,
   );
+
   const graphData_json = JSON.stringify(graphData);
+
   const graphData_list: string[] = [];
+
   JSON.parse(graphData_json).map(
     (path: {
       result: Array<{
@@ -64,12 +68,17 @@ async function getGraph(state: typeof chainState.State) {
       }>;
     }) => {
       const pathData_set = new Set<string>();
-      path['result'].map((data) => {
-        if (data.CATEGORY && data.id) {
-          pathData_set.add(data.id);
-        }
-      });
-      graphData_list.push(Array.from(pathData_set).join('>'));
+      const pathData_result = path['result'];
+      if (pathData_result.length === 0) {
+        graphData_list.push('No data found'); // Ensure the function exits without returning undefined
+      } else {
+        pathData_result.map((data) => {
+          if (data.CATEGORY && data.id) {
+            pathData_set.add(data.id);
+          }
+        });
+        graphData_list.push(Array.from(pathData_set).join('>'));
+      }
     },
   );
   const graphData_string: string = graphData_list.join('\n');
@@ -187,7 +196,9 @@ async function getPath(state: typeof chainState.State) {
       - 严格遵循知识点的逻辑依赖关系（A→B 表示必须先掌握A，才能理解B）。 
       - 仅保留最核心的知识点，避免冗余，确保路径最短且最有效。 
       - 输出格式必须为严格的线性序列，即 A→B→C→D，不能出现并列项（如 A→B 且 A→C）。 
-      - 知识点表述必须简洁明了，避免冗长的解释。
+      - 知识点表述必须简洁明了，避免冗长的解释，同时也避免过于笼统的表述（如“基础概念”），直接给出核心内容。
+      - 不需要过多强调学生背景与实践应用，除非直接影响学习路径的设计。
+      - 不需要考虑学术交流、数据建模等能力提升、跨学科研究方法、总结与展望等无关且没有实际内容的知识点。
       4. 最终输出格式：
       - 仅输出的学习路径应为知识点顺序学习列表，从初始知识点到最终知识点，用“->”分隔,示例：基础化学知识→矿物化学（硅酸盐及其活性成分）→ 煤矸石的形成→煤矸石的化学组分→煤矸石的活性因素→资源化利用方法->矿物回收->建筑材料应用。
       - 不需要给出其他描述性语言。`,
@@ -202,13 +213,10 @@ async function getPath(state: typeof chainState.State) {
     },
   ]);
 
-
-
   return { pathData: response['path'] };
 }
 
 async function refinePath(state: typeof chainState.State) {
-
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
     modelName: openai_chat_model,
@@ -224,15 +232,47 @@ async function refinePath(state: typeof chainState.State) {
   const response = await structuredLlm.invoke([
     {
       role: 'assistant',
-      content: `将设计好的学习路径（'->'分隔）中的每个环节（要求：只保留文字语义内容；不要保留序号）重新用顺序列表表示。`,
+      content: `将设计好的学习路径（'->'分隔）中的每个环节（要求：只保留文字语义内容；不要保留序号）重新用顺序列表表示。按照以下要求进行适当优化：
+      - 知识点（必须是名词，不需要掌握、理解、了解等动词描述）表述必须简洁明了，避免冗长的解释，同时也避免过于笼统的表述（如“基础概念”、“研究进展”、“技术应用”），直接给出核心内容。`,
     },
     {
       role: 'human',
       content: `学习路径：${state.pathData ?? '无'}`,
-    }
+    },
   ]);
 
   return { pathData: response['path'] };
+}
+
+async function outputPath(state: typeof chainState.State) {
+  const url = process.env.NEO4J_URI ?? '';
+  const username = process.env.NEO4J_USER ?? '';
+  const password = process.env.NEO4J_PASSWORD ?? '';
+  const driver = neo4j.driver(url, neo4j.auth.basic(username, password));
+  const session = driver.session();
+
+  try {
+    const query = `
+      UNWIND $list AS item
+      MERGE (n:Concept {id: item})
+      ON CREATE SET n.tag = "learning_path"
+      RETURN n
+    `;
+    const result = await session.run(query, { list: state.pathData });
+
+    const nodes: { name: string; id: string }[] = result.records.map((record) => {
+      const node = record.get('n');
+      return {
+        name: node.properties.id,
+        id: node.elementId,
+      };
+    });
+
+    return { pathData: nodes };
+  } finally {
+    await session.close();
+    await driver.close();
+  }
 }
 
 const workflow = new StateGraph(chainState)
@@ -241,7 +281,8 @@ const workflow = new StateGraph(chainState)
   .addNode('getPortrait', getPortrait)
   .addNode('getPath', getPath)
   .addNode('getKnowledge', getKnowledge)
-  .addNode('refinePath',refinePath)
+  .addNode('refinePath', refinePath)
+  .addNode('outputPath', outputPath)
   .addEdge('__start__', 'getGraph')
   .addEdge('__start__', 'getRefs')
   .addEdge('__start__', 'getPortrait')
@@ -250,7 +291,8 @@ const workflow = new StateGraph(chainState)
   .addEdge('getPortrait', 'getKnowledge')
   .addEdge('getKnowledge', 'getPath')
   .addEdge('getPath', 'refinePath')
-  .addEdge('refinePath', '__end__');
+  .addEdge('refinePath', 'outputPath')
+  .addEdge('outputPath', '__end__');
 
 export const graph = workflow.compile({
   // if you want to update the state before calling the tools
