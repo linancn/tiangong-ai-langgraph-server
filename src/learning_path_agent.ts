@@ -159,7 +159,7 @@ async function getKnowledge(state: typeof chainState.State) {
       content: `以下是主要知识点总结：${state.refData ?? '无'}。`,
     },
   ]);
-  console.log(response);
+
   return { graphData: response.content };
 }
 
@@ -188,7 +188,9 @@ async function getPath(state: typeof chainState.State) {
       - 仅保留最核心的知识点，避免冗余，确保路径最短且最有效。 
       - 输出格式必须为严格的线性序列，即 A→B→C→D，不能出现并列项（如 A→B 且 A→C）。 
       - 知识点表述必须简洁明了，避免冗长的解释。
-      4. 输出格式：最终输出的学习路径应为知识点顺序学习列表，从初始知识点到最终知识点，用“->”分隔,示例：基础化学知识→矿物化学（硅酸盐及其活性成分）→ 煤矸石的形成→煤矸石的化学组分→煤矸石的活性因素→资源化利用方法->矿物回收->建筑材料应用。`,
+      4. 最终输出格式：
+      - 仅输出的学习路径应为知识点顺序学习列表，从初始知识点到最终知识点，用“->”分隔,示例：基础化学知识→矿物化学（硅酸盐及其活性成分）→ 煤矸石的形成→煤矸石的化学组分→煤矸石的活性因素→资源化利用方法->矿物回收->建筑材料应用。
+      - 不需要给出其他描述性语言。`,
     },
     {
       role: 'human',
@@ -199,6 +201,37 @@ async function getPath(state: typeof chainState.State) {
       content: `学生学习特点与需求:${state.portraitData ?? '无'}。`,
     },
   ]);
+
+
+
+  return { pathData: response['path'] };
+}
+
+async function refinePath(state: typeof chainState.State) {
+
+  const model = new ChatOpenAI({
+    apiKey: openai_api_key,
+    modelName: openai_chat_model,
+    streaming: false,
+  });
+
+  const pathResult = z.object({
+    path: z.array(z.string().describe('知识点顺序学习列表')),
+  });
+
+  const structuredLlm = model.withStructuredOutput(pathResult);
+
+  const response = await structuredLlm.invoke([
+    {
+      role: 'assistant',
+      content: `将设计好的学习路径（'->'分隔）中的每个环节（要求：只保留文字语义内容；不要保留序号）重新用顺序列表表示。`,
+    },
+    {
+      role: 'human',
+      content: `学习路径：${state.pathData ?? '无'}`,
+    }
+  ]);
+
   return { pathData: response['path'] };
 }
 
@@ -208,6 +241,7 @@ const workflow = new StateGraph(chainState)
   .addNode('getPortrait', getPortrait)
   .addNode('getPath', getPath)
   .addNode('getKnowledge', getKnowledge)
+  .addNode('refinePath',refinePath)
   .addEdge('__start__', 'getGraph')
   .addEdge('__start__', 'getRefs')
   .addEdge('__start__', 'getPortrait')
@@ -215,7 +249,8 @@ const workflow = new StateGraph(chainState)
   .addEdge('getRefs', 'getKnowledge')
   .addEdge('getPortrait', 'getKnowledge')
   .addEdge('getKnowledge', 'getPath')
-  .addEdge('getPath', '__end__');
+  .addEdge('getPath', 'refinePath')
+  .addEdge('refinePath', '__end__');
 
 export const graph = workflow.compile({
   // if you want to update the state before calling the tools
