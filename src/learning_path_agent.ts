@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 // OpenAI
 const openai_api_key = process.env.OPENAI_API_KEY ?? '';
+const openai_chat_model = process.env.OPENAI_CHAT_MODEL ?? '';
+const openai_chat_model_mini = process.env.OPENAI_CHAT_MODEL_MINI ?? '';
 
 // Supabase
 const base_url = process.env.BASE_URL ?? '';
@@ -103,7 +105,7 @@ async function getRefs(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -124,7 +126,7 @@ async function getRefs(state: typeof chainState.State) {
 async function getPortrait(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -149,7 +151,7 @@ async function getPortrait(state: typeof chainState.State) {
 async function getKnowledge(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -174,7 +176,7 @@ async function getKnowledge(state: typeof chainState.State) {
 async function getPath(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model,
     streaming: false,
   });
 
@@ -218,7 +220,7 @@ async function getPath(state: typeof chainState.State) {
 async function refinePath(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model,
     streaming: false,
   });
 

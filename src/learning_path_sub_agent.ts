@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 // OpenAI
 const openai_api_key = process.env.OPENAI_API_KEY ?? '';
+const openai_chat_model_mini = process.env.OPENAI_CHAT_MODEL_MINI ?? '';
 
 // Supabase
 const base_url = process.env.BASE_URL ?? '';
@@ -57,7 +58,7 @@ async function getRefs(state: typeof chainState.State) {
 async function getGraphData(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: 'gpt-4o-mini',
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -66,11 +67,11 @@ async function getGraphData(state: typeof chainState.State) {
   });
 
   const structuredLlm = model.withStructuredOutput(pathResult);
-
+  // and extract a knowledge structure centered around a single core concept. Reconstruct the content into a framework where all directly related knowledge points radiate outward from the core. Follow these detailed instructions:
   const response = await structuredLlm.invoke([
     {
       role: 'assistant',
-      content: `Analyze the provided textbook chunks related to "${state.content}" and extract a knowledge structure centered around a single core concept. Reconstruct the content into a framework where all directly related knowledge points radiate outward from the core. Follow these detailed instructions:
+      content: `Analyze the provided textbook chunks related to "${state.content}" as reference material to help construct a knowledge structure centered around "${state.knowledge_point}". While using these materials as guidance, focus on creating a comprehensive and logical knowledge framework. Follow these detailed instructions:
 1. Framework Structure:
    - Root Node: The subject, represented by the concise term of "${state.knowledge_point}".
    - Related Nodes: Identify **only the most essential sub-concepts or components** that are direct constituents of ${state.knowledge_point}.
