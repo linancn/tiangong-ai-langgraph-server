@@ -3,13 +3,23 @@ import { Annotation, Send, StateGraph } from '@langchain/langgraph';
 import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 
-const openai_model = process.env.OPENAI_CHAT_MODEL ?? '';
+const openai_chat_model_mini = process.env.OPENAI_CHAT_MODEL_MINI ?? '';
 const openai_api_key = process.env.OPENAI_API_KEY ?? '';
 const question_types = ['SingeChoice', 'MultipleChoices', 'ShortAnswer'];
+
+type userElement = {
+  grade?: string;
+  major_background?: string;
+  grasp_level?: string;
+  major?: string;
+  history?: string[];
+};
 
 const chainState = Annotation.Root({
   input: Annotation<string>(),
   descriptions: Annotation<string>(),
+  userData: Annotation<userElement>(),
+  portraitData: Annotation<string>(),
   graphData: Annotation<string>(),
   numbers: Annotation<number>({ reducer: (_, y) => y, default: () => 1 }),
   instructions: Annotation<string>(),
@@ -56,7 +66,13 @@ async function getGraph(state: typeof chainState.State) {
 }
 
 async function routeSimpleQustions(state: typeof chainState.State): Promise<Send[]> {
-  const SYSTEM_PROMPT = `Generate a very simple question based on the following topic —— ${state.input}, focusing on core concepts or key facts that require the user to recall and apply the information. The question should help reinforce memory and deepen understanding of the subject. After the question, provide a clear and concise answer that explains the key point and helps clarify the concept.`;
+  const SYSTEM_PROMPT = `Generate a very simple question based on the following topic —— ${state.input}, specifically targeting potential knowledge gaps identified in the student's historical interactions.
+  Review their conversation history (${state.userData.history?.join('； ')}) to identify areas where they may have misconceptions or incomplete understanding.
+  The question should help address these specific knowledge gaps while reinforcing core concepts.
+  After the question, provide a clear and concise answer that explains the key point and helps clarify the concept, with special attention to the student's academic background (${state.userData.grade ?? '本科生'}, ${state.userData.major_background ?? '没有经验'}) and current grasp level (${state.userData.grasp_level ?? '不太熟练'}).
+  Ouput these questions in ** Chinese **.
+  `;
+
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
@@ -67,7 +83,12 @@ async function routeSimpleQustions(state: typeof chainState.State): Promise<Send
 }
 
 async function routeMediumQustions(state: typeof chainState.State): Promise<Send[]> {
-  const SYSTEM_PROMPT = `Generate a medium-difficulty exam question that tests the understanding of key concepts in ${state.input}. The question should require the respondent to demonstrate their comprehension of the material and apply their knowledge to a relevant scenario. Ensure the question is challenging enough to stimulate critical thinking and encourage a deeper understanding of the topic.`;
+  const SYSTEM_PROMPT = `Generate a medium-difficulty exam question that tests the understanding of key concepts in ${state.input}, specifically targeting potential knowledge gaps identified in the student's historical interactions. 
+  Review their conversation history (${state.userData.history?.join('； ')}) to identify areas where they may have misconceptions or incomplete understanding.
+  The question should require the respondent to demonstrate their comprehension of the material and apply their knowledge to a relevant scenario.
+  Ensure the question is challenging enough to stimulate critical thinking and encourage a deeper understanding of the topic.
+  After the question, provide a clear and concise answer that explains the key point and helps clarify the concept, with special attention to the student's academic background (${state.userData.grade ?? '硕士生'}, ${state.userData.major_background ?? '具有一定经验'}) and current grasp level (${state.userData.grasp_level ?? '基本掌握'}).
+  Ouput these questions in ** Chinese **.`;
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
@@ -78,7 +99,11 @@ async function routeMediumQustions(state: typeof chainState.State): Promise<Send
 }
 
 async function routeHardQustions(state: typeof chainState.State): Promise<Send[]> {
-  const SYSTEM_PROMPT = `Generate a high-difficulty exam question that assesses a student's deep understanding of key concepts in ${state.input}. The question should require the student to critically analyze and synthesize their knowledge, applying it to a complex real-world problem or scenario. The task should challenge the student to demonstrate not only their theoretical understanding but also their ability to integrate and use the knowledge in practical, real-world contexts.`;
+  const SYSTEM_PROMPT = `Generate a high-difficulty exam question that assesses a student's deep understanding of key concepts in ${state.input}, specifically targeting potential knowledge gaps identified in the student's historical interactions.
+  Review their conversation history (${state.userData.history?.join('； ')}) to identify areas where they may have misconceptions or incomplete understanding.
+  The question should require the student to critically analyze and synthesize their knowledge, applying it to a complex real-world problem or scenario.
+  The task should challenge the student to demonstrate not only their theoretical understanding but also their ability to integrate and use the knowledge in practical, real-world contexts.
+  After the question, provide a clear and concise answer that explains the key point and helps clarify the concept, with special attention to the student's academic background (${state.userData.grade ?? '博士生'}, ${state.userData.major_background ?? '具有丰富经验'}) and current grasp level (${state.userData.grasp_level ?? '十分熟练'}). Ouput these questions in ** Chinese **.`;
   return question_types.map((type) => {
     return new Send(type, {
       instructions: SYSTEM_PROMPT,
@@ -104,7 +129,7 @@ async function SingeChoice(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_model,
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -127,7 +152,7 @@ ${state.descriptions !== '' ? `- Descriptions:  ${state.descriptions}` : ''}
 - Explanation: Provide a clear and concise explanation of the correct answer, helping students understand why the answer is correct and why the other options are incorrect.
 - Avoid extreme terms: Do not include extreme terms like “always” or “never” in the options, as they are easily ruled out by students.
 - Question clarity: The question should be clear and concise, ensuring students can easily understand what is being asked.
-- Knowledge alignment: Ensure that the content of the question and the options aligns with the knowledge extracted from the Neo4j database.
+- Knowledge alignment: Use the knowledge extracted from the Neo4j database as a reference point for creating questions, but feel free to incorporate related concepts or extend beyond the exact data provided.
 
 Neo4j query results: ${state.graphData}
 `,
@@ -162,7 +187,7 @@ async function MultipleChoices(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_model,
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -185,7 +210,7 @@ ${state.descriptions !== '' ? `- Descriptions:  ${state.descriptions}` : ''}
 - Explanation: Provide a clear and concise explanation of these correct answer, helping students understand why the answer is correct and why the other options are incorrect.
 - Avoid extreme terms: Do not include extreme terms like “always” or “never” in the options, as they are easily ruled out by students.
 - Question clarity: The question should be clear and concise, ensuring students can easily understand what is being asked.
-- Knowledge alignment: Ensure that the content of the question and the options aligns with the knowledge extracted from the Neo4j database.
+- Knowledge alignment: Use the knowledge extracted from the Neo4j database as a reference point for creating questions, but feel free to incorporate related concepts or extend beyond the exact data provided.
 
 Neo4j query results: ${state.graphData}
 `,
@@ -213,7 +238,7 @@ async function ShortAnswer(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_model,
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -233,7 +258,7 @@ ${state.descriptions !== '' ? `- Descriptions:  ${state.descriptions}` : ''}
 - Difficulty level: Assign a difficulty level to the question based on the complexity of the content. 1 and 2 mean easy, 3 means medium, 4 and 5 mean hard.
 - Explanation: Provide a clear and concise explanation of this question that includes the key points that should be present in a complete answer. List the specific elements that would constitute a correct and complete response.
 - Question clarity: The question should be clear and concise, ensuring students can easily understand what is being asked.
-- Knowledge alignment: Ensure that the content of the question and the options aligns with the knowledge extracted from the Neo4j database.
+- Knowledge alignment: Use the knowledge extracted from the Neo4j database as a reference point for creating questions, but feel free to incorporate related concepts or extend beyond the exact data provided.
 
 Neo4j query results: ${state.graphData}
 `,
@@ -251,7 +276,6 @@ Neo4j query results: ${state.graphData}
 }
 
 async function outputQuestions(state: typeof chainState.State) {
-  console.log(state.questions.length);
   return { output: state.questions };
 }
 
