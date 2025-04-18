@@ -28,6 +28,7 @@ type supabaseElement = {
 const chainState = Annotation.Root({
   content: Annotation<string>(),
   knowledge_point: Annotation<string>(),
+  learning_path: Annotation<{ name: string; id: string }[]>(),
   supabase_auth: Annotation<supabaseElement>(),
   userData: Annotation<userElement>(),
   refData: Annotation<{ content: string; source: string }>(),
@@ -114,14 +115,16 @@ async function returnGraph(state: typeof chainState.State) {
     `;
 
     const result_nodes = await session.run(query_nodes, { list: state.graphData });
-
-    const nodes: { name: string; id: string }[] = result_nodes.records.map((record) => {
-      const node = record.get('n');
-      return {
-        name: node.properties.id,
-        id: node.elementId,
-      };
-    });
+    const existingIds = new Set(state.learning_path.map((node) => node.id));
+    const nodes: { name: string; id: string }[] = result_nodes.records
+      .map((record) => {
+        const node = record.get('n');
+        return {
+          name: node.properties.id,
+          id: node.elementId,
+        };
+      })
+      .filter((node) => !existingIds.has(node.id));
 
     const query_edges = `
       MATCH (a {id: $start_name})
