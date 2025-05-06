@@ -31,5 +31,10 @@ sudo langgraph up
 nohup node dist/multi_agents/kg_textbooks.js > kg_textbook.log 2>&1 &
 tmux new -d -s neo4j_import 'node dist/multi_agents/kg_textbooks.js > kg_textbook.log 2>&1'
 tmux kill-session -t neo4j_import
-``
+```
+
+## Test prototype
+
+```bash
+npx ts-node src/prototype/structured_output.ts
 ```
