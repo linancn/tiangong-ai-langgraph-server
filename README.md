@@ -11,7 +11,7 @@ nvm use
 
 npm install
 # Update npm packages
-npm update
+npm update && npm ci
 ```
 
 ## Start server
