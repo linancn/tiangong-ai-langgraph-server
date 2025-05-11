@@ -5,17 +5,18 @@
   },
   "dependencies": {
     "@langchain/community": "^0.3.42",
-    "@langchain/core": "^0.3.53",
-    "@langchain/langgraph": "^0.2.68",
+    "@langchain/core": "^0.3.55",
+    "@langchain/langgraph": "^0.2.71",
     "@langchain/openai": "^0.5.10",
     "axios": "^1.9.0",
-    "langsmith": "^0.3.25",
+    "langsmith": "^0.3.28",
     "neo4j-driver": "^5.28.1",
     "pyodide": "^0.26.4",
     "zod": "^3.24.4",
     "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
+    "@apidevtools/json-schema-ref-parser": "^12.0.1",
     "@tsconfig/recommended": "^1.0.8",
     "dotenv": "^16.5.0",
     "prettier": "^3.5.3",
