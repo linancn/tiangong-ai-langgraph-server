@@ -51,8 +51,8 @@ const defaultOptions = {
     baseURL: openai_base_url,
   },
 };
-console.log('defaultOptions');
-console.log(JSON.stringify(defaultOptions));
+// console.log('defaultOptions');
+// console.log(JSON.stringify(defaultOptions));
 
 const suggestDataNode = async (state: typeof InternalStateAnnotation.State): Promise<Partial<typeof OutputStateAnnotation.State>>  => {
   const response = await suggestData(state.data, state.dataType, {
