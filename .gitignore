@@ -5,3 +5,10 @@ package-lock.json
 dist/
 src/data/
 test_data/
+
+# cache
+.DS_Store
+
+# vscode
+.vscode/
+
