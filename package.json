@@ -8,6 +8,7 @@
     "@langchain/core": "^0.3.55",
     "@langchain/langgraph": "^0.2.71",
     "@langchain/openai": "^0.5.10",
+    "@tiangong-lca/tidas-sdk": "^0.1.15",
     "axios": "^1.9.0",
     "langsmith": "^0.3.28",
     "neo4j-driver": "^5.28.1",
