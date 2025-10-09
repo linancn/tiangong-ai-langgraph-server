@@ -105,7 +105,7 @@ async function getRefs(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model_mini,
+    model: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -126,7 +126,7 @@ async function getRefs(state: typeof chainState.State) {
 async function getPortrait(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model_mini,
+    model: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -151,7 +151,7 @@ async function getPortrait(state: typeof chainState.State) {
 async function getKnowledge(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model_mini,
+    model: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -176,7 +176,7 @@ async function getKnowledge(state: typeof chainState.State) {
 async function getPath(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model,
+    model: openai_chat_model,
     streaming: false,
   });
 
@@ -220,7 +220,7 @@ async function getPath(state: typeof chainState.State) {
 async function refinePath(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model,
+    model: openai_chat_model,
     streaming: false,
   });
 

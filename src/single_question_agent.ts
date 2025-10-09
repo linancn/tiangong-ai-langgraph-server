@@ -45,7 +45,7 @@ async function SingleChoice(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model_mini,
+    model: openai_chat_model_mini,
     streaming: false,
   });
 
@@ -57,7 +57,7 @@ async function SingleChoice(state: typeof chainState.State) {
       content: `According to the given knowledge descriptions, generate a Single-choice question related to '${state.knowledge_point ?? ''}' with the following guidelines:
 - Language: Chinese.
 - Question body: The question should focus on core concepts or key facts that require the user to recall and apply the information.
-- Options: Provide four options labeled A, B, C, and D, with one correct answer and three distractors. Distractors should be plausible but incorrect, requiring careful consideration to identify the correct answer.
+- Question options: Provide four options labeled A, B, C, and D, with one correct answer and three distractors. Distractors should be plausible but incorrect, requiring careful consideration to identify the correct answer.
 - Answer: Indicate the correct answer by specifying the corresponding option (A, B, C, or D).
 - Explanation: Provide a clear and concise explanation of the correct answer, helping students understand why the answer is correct and why the other options are incorrect.
 - Avoid extreme terms: Do not include extreme terms like “always” or “never” in the options, as they are easily ruled out by students.
@@ -72,7 +72,7 @@ async function SingleChoice(state: typeof chainState.State) {
     {
       role: 'human',
       content: `Question history: ${
-        state.question_history.map((q) => q.question).join('\n ') ?? ''
+        state.question_history?.map((q) => q.question).join('\n ') ?? ''
       }`,
     },
   ]);
@@ -107,7 +107,7 @@ async function MultipleChoices(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model,
+    model: openai_chat_model,
     streaming: false,
   });
 
@@ -119,7 +119,7 @@ async function MultipleChoices(state: typeof chainState.State) {
       content: `Generate a Multiple-choice question (Focus on higher-order thinking skills rather than basic comprehension of knowledge descriptions) related to '${state.knowledge_point ?? ''}' with the following guidelines:
 - Language: Must be in Chinese.
 - Question body: The question should focus on core concepts or key facts that require the user to recall and apply the information.
-- Options: Provide four options labeled A, B, C, and D, with at least two correct answer and other distractors. Ensure distractors are sophisticated distractors that: draw from related but distinct concepts, represent common student errors in reasoning, include elements that might be true in different contexts, and require domain knowledge to identify as incorrect.
+- Question options: Provide four options labeled A, B, C, and D, with at least two correct answer and other distractors. Ensure distractors are sophisticated distractors that: draw from related but distinct concepts, represent common student errors in reasoning, include elements that might be true in different contexts, and require domain knowledge to identify as incorrect.
 - Answer: Indicate the correct answer by specifying the corresponding option (A, B, C, or D).
 - Explanation: Provide a clear and concise explanation of these correct answer, helping students understand why the answer is correct and why the other options are incorrect.
 - Avoid extreme terms: Do not include extreme terms like “always”, "only", "just" or “never” in the options, as they are easily ruled out by students.
@@ -144,7 +144,7 @@ async function MultipleChoices(state: typeof chainState.State) {
     {
       role: 'human',
       content: `Question history: ${
-        state.question_history.map((q) => q.question).join('\n ') ?? ''
+        state.question_history?.map((q) => q.question).join('\n ') ?? ''
       }`,
     },
   ]);
@@ -170,4 +170,5 @@ const workflow = new StateGraph(chainState)
 export const graph = workflow.compile({
   // if you want to update the state before calling the tools
   // interruptBefore: [],
-});``
+});
+``;
