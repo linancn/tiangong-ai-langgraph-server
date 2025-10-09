@@ -59,7 +59,7 @@ async function getRefs(state: typeof chainState.State) {
 async function getGraphData(state: typeof chainState.State) {
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model_mini,
+    model: openai_chat_model_mini,
     streaming: false,
   });
 
