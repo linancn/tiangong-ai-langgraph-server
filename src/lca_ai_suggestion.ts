@@ -1,7 +1,7 @@
 import { suggestData } from '@tiangong-lca/tidas-sdk';
-import { MessagesAnnotation, StateGraph,Annotation } from '@langchain/langgraph';
-import { z } from 'zod';
-import { BaseMessage } from '@langchain/core/messages';
+import { StateGraph,Annotation } from '@langchain/langgraph';
+// import { z } from 'zod';
+// import { BaseMessage } from '@langchain/core/messages';
 
 
 // const inputSchema = z.object({
@@ -55,10 +55,13 @@ const defaultOptions = {
 // console.log(JSON.stringify(defaultOptions));
 
 const suggestDataNode = async (state: typeof InternalStateAnnotation.State): Promise<Partial<typeof OutputStateAnnotation.State>>  => {
+  const timeStart = Date.now();
   const response = await suggestData(state.data, state.dataType, {
     ...defaultOptions,
     ...state.options,
   });
+  const timeEnd = Date.now();
+  console.log(`SuggestDataNode: Time taken: ${timeEnd - timeStart} milliseconds`);
   // console.log('response');
   // console.log(JSON.stringify(response));
   return {  data: response.data, dataType: state.dataType, options: state.options, diffSummary: response.diffSummary, diffHTML: response.diffHTML, success: response.success, error: response.error};
