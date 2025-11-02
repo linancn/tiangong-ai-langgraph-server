@@ -15,6 +15,8 @@
     "learning_path_agent": "./src/learning_path_agent.ts:graph",
     "learning_path_sub_agent": "./src/learning_path_sub_agent.ts:graph",
     "single_question_agent": "./src/single_question_agent.ts:graph",
+    "quiz_agent": "./src/quiz_agent.ts:graph",
+    "course_exam_agent": "./src/course_exam_agent.ts:graph",
     "lca_ai_suggestion": "./src/lca_ai_suggestion.ts:graph"
   },
   "env": ".env"
