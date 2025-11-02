@@ -11,6 +11,41 @@ type questionElement = {
   complete: string;
 };
 
+const optionSchema = z.object({
+  key: z.enum(['A', 'B', 'C', 'D']),
+  value: z.string().describe('option'),
+});
+
+const optionsArraySchema = z
+  .array(optionSchema)
+  .length(4)
+  .superRefine((options, ctx) => {
+    const keySet = new Set<string>();
+    const valueMap = new Map<string, number>();
+
+    options.forEach((option, index) => {
+      if (keySet.has(option.key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Each option key must be unique.',
+          path: [index, 'key'],
+        });
+      }
+      keySet.add(option.key);
+
+      const normalizedValue = option.value.trim();
+      if (valueMap.has(normalizedValue)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Each option text must be unique.',
+          path: [index, 'value'],
+        });
+      } else {
+        valueMap.set(normalizedValue, index);
+      }
+    });
+  });
+
 const chainState = Annotation.Root({
   knowledge_point: Annotation<string>(),
   knowledge_descriptions: Annotation<string>(),
@@ -32,12 +67,7 @@ async function SingleChoice(state: typeof chainState.State) {
     Body: z
       .string()
       .describe('Only the question body, dont include the options and also other information.'),
-    Options: z.array(
-      z.object({
-        key: z.enum(['A', 'B', 'C', 'D']),
-        value: z.string().describe('option'),
-      }),
-    ),
+    Options: optionsArraySchema,
     Answer: z.array(z.enum(['A', 'B', 'C', 'D'])).describe('One correct answer to this question'),
     // difficulty: z.enum(['1', '2']).describe('difficulty level of the question, 1 means basic, 2 means hard'),
     Remark: z.string().describe('explanation of the answer'),
@@ -93,12 +123,7 @@ async function MultipleChoices(state: typeof chainState.State) {
     Body: z
       .string()
       .describe('Only the question body, dont include the options and also other information'),
-    Options: z.array(
-      z.object({
-        key: z.enum(['A', 'B', 'C', 'D']),
-        value: z.string().describe('option'),
-      }),
-    ),
+    Options: optionsArraySchema,
     Answer: z
       .array(z.enum(['A', 'B', 'C', 'D']))
       .describe('A set of correct answers to this question'),
