@@ -11,7 +11,6 @@ type userElement = {
   grasp_level?: string;
   major?: string;
   history?: string[];
-  student_id?: string;
 };
 
 const singleChoiceSchema = z.object({
@@ -122,28 +121,27 @@ async function GenerateQuizQuestions(state: typeof chainState.State) {
   const userContext = state.user_context ?? {};
   const today = new Date().toISOString().slice(0, 10);
   const seedComponents = [
-    userContext.student_id ?? '',
     userContext.grade ?? '',
     userContext.major ?? '',
     today,
   ].filter((component) => component && component.length > 0);
   const variantSeed = seedComponents.length > 0 ? seedComponents.join('|') : today;
 
-  const userContextSummary =
-    Object.keys(userContext).length === 0
-      ? '无'
-      : [
-          userContext.student_id ? `学生ID: ${userContext.student_id}` : '',
-          userContext.grade ? `年级: ${userContext.grade}` : '',
-          userContext.major ? `专业: ${userContext.major}` : '',
-          userContext.major_background ? `专业背景: ${userContext.major_background}` : '',
-          userContext.grasp_level ? `掌握程度: ${userContext.grasp_level}` : '',
-          (userContext.history?.length ?? 0) > 0
-            ? `历史错题: ${userContext.history?.join('； ')}`
-            : '',
-        ]
-          .filter((entry) => entry.length > 0)
-          .join('； ');
+  const userContextEntries = [
+    userContext.grade ? `年级线索：${userContext.grade}` : '',
+    userContext.major ? `学科方向：${userContext.major}` : '',
+    userContext.major_background ? `既有背景：${userContext.major_background}` : '',
+    userContext.grasp_level ? `掌握程度：${userContext.grasp_level}` : '',
+    (userContext.history?.length ?? 0) > 0
+      ? `常见易错点提示：易混淆于${userContext.history?.join('； ')}`
+      : '',
+  ].filter((entry) => entry.length > 0);
+
+  const userContextSummary = userContextEntries.length === 0 ? '无' : userContextEntries.join('； ');
+  const userContextPrompt =
+    userContextSummary === '无'
+      ? '学生上下文：无。'
+      : `学生上下文（仅用于把握命题侧重点和难度，题干中严禁出现与学生相关的描述或身份信息）：${userContextSummary}`;
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
@@ -159,6 +157,8 @@ async function GenerateQuizQuestions(state: typeof chainState.State) {
       content: `你是一名教学设计专家，负责根据给定的样题生成高度相似且不重复的练习题。
 请严格遵循以下要求：
 - 语言：全程使用中文编写题干、选项、答案与解析。
+- 表述要求：题干及解析保持客观、中性，采用第三人称或情境化描述，避免使用“你”“您的”等第一、第二人称，并不得直接引用具体学生身份或点名；如需引用学生上下文，请以场景设定或第三方叙述方式呈现，仅可使用“某类”“面向”等泛化称谓，禁止出现“该学生”“该博士”等措辞。
+- 题干要求：题干必须专注于问题本身，不得包含学生背景、教学提示或任何补充说明；上下文信息仅可用于调整题目设定思路而非直接写入题干。
 - 题型规范：每道题必须严格匹配以下之一的结构：
   * 单选题：仅 1 个正确选项。
   * 多选题：存在多个正确选项。
@@ -186,7 +186,7 @@ async function GenerateQuizQuestions(state: typeof chainState.State) {
     },
     {
       role: 'human',
-      content: `学生上下文: ${userContextSummary}`,
+      content: userContextPrompt,
     },
     {
       role: 'human',
