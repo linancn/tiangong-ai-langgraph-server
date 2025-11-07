@@ -17,6 +17,7 @@
     "single_question_agent": "./src/single_question_agent.ts:graph",
     "quiz_agent": "./src/quiz_agent.ts:graph",
     "course_exam_agent": "./src/course_exam_agent.ts:graph",
+    "student_portrait_agent": "./src/student_portrait_agent.ts:graph",
     "lca_ai_suggestion": "./src/lca_ai_suggestion.ts:graph"
   },
   "env": ".env"

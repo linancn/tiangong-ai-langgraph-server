@@ -15,22 +15,26 @@ type userElement = {
 
 type QuestionType = 'SingleChoice' | 'MultipleChoices' | 'ShortAnswer';
 
-type ExamPlanItem = {
-  mergedLabel: string;
-  knowledgePoints: string[];
-  questionType: QuestionType;
-  questionCount: number;
-  difficulty: number;
-  focus: string;
-  rationale: string;
-  expectedSkills: string[];
-  answerExpectations: string;
-};
+const examPlanItemSchema = z.object({
+  mergedLabel: z.string(),
+  knowledgePoints: z.array(z.string()).min(1),
+  questionType: z.enum(['SingleChoice', 'MultipleChoices', 'ShortAnswer']),
+  questionCount: z.number().min(1).max(3),
+  difficulty: z.number().min(3).max(5),
+  focus: z.string(),
+  rationale: z.string(),
+  expectedSkills: z.array(z.string()).min(1),
+  answerExpectations: z.string(),
+});
 
-type ExamPlan = {
-  strategy: string;
-  blueprint: ExamPlanItem[];
-};
+type ExamPlanItem = z.infer<typeof examPlanItemSchema>;
+
+const examPlanSchema = z.object({
+  strategy: z.string(),
+  blueprint: z.array(examPlanItemSchema).min(3),
+});
+
+type ExamPlan = z.infer<typeof examPlanSchema>;
 
 const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
   SingleChoice: '单选题',
@@ -250,8 +254,8 @@ function lookupKnowledgeDetail(
     return exact[1];
   }
 
-  const partial = Object.entries(knowledgeMap).find(([key]) =>
-    key.includes(trimmed) || trimmed.includes(key),
+  const partial = Object.entries(knowledgeMap).find(
+    ([key]) => key.includes(trimmed) || trimmed.includes(key),
   );
   if (partial) {
     return partial[1];
@@ -357,7 +361,10 @@ const chainState = Annotation.Root({
   /**
    * 内部使用 - 当前命题蓝图条目。
    */
-  planItem: Annotation<ExamPlanItem | undefined>({ reducer: (_, y) => y, default: () => undefined }),
+  planItem: Annotation<ExamPlanItem | undefined>({
+    reducer: (_, y) => y,
+    default: () => undefined,
+  }),
   /**
    * 内部使用 - 传递给题目生成模型的具体指令。
    */
@@ -385,26 +392,6 @@ async function prepareKnowledgeContext(state: typeof chainState.State) {
     knowledgeTree: summary.condensedRaw,
   };
 }
-
-
-const examPlanSchema = z.object({
-  strategy: z.string(),
-  blueprint: z
-    .array(
-      z.object({
-        mergedLabel: z.string(),
-        knowledgePoints: z.array(z.string()).min(1),
-        questionType: z.enum(['SingleChoice', 'MultipleChoices', 'ShortAnswer']),
-        questionCount: z.number().min(1).max(3),
-        difficulty: z.number().min(3).max(5),
-        focus: z.string(),
-        rationale: z.string(),
-        expectedSkills: z.array(z.string()).min(1),
-        answerExpectations: z.string(),
-      }),
-    )
-    .min(3),
-});
 
 async function prepareExamPlan(state: typeof chainState.State) {
   const studentProfile = formatStudentProfile(state.studentProfile ?? {});
