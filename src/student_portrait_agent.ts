@@ -7,15 +7,12 @@ import { basename } from 'node:path';
 import { z } from 'zod';
 
 const openai_api_key = process.env.OPENAI_API_KEY ?? '';
-const openai_chat_model =
-  process.env.OPENAI_CHAT_MODEL_REASONNING ?? process.env.OPENAI_CHAT_MODEL ?? '';
+const openai_chat_model =  process.env.OPENAI_CHAT_MODEL_REASONNING ?? '';
+const openai_chat_model_mini = process.env.OPENAI_CHAT_MODEL_REASONNING_MINI ?? '';
 const mineru_base_url = process.env.MINERU_BASE_URL ?? '';
 const mineru_api_key = process.env.MINERU_API_KEY ?? '';
 const mineru_vision_provider = process.env.MINERU_VISION_PROVIDER ?? '';
 const mineru_vision_model = process.env.MINERU_VISION_MODEL ?? '';
-const mineru_vision_prompt = process.env.MINERU_VISION_PROMPT ?? '';
-const mineru_chunk_type_flag = process.env.MINERU_CHUNK_TYPE ?? 'true';
-const mineru_pretty_flag = process.env.MINERU_PRETTY ?? 'true';
 const student_portrait_bucket = process.env.STUDENT_PORTRAIT_BUCKET ?? '';
 const student_portrait_bucket_region = process.env.STUDENT_PORTRAIT_BUCKET_REGION ?? '';
 const student_portrait_bucket_access_key = process.env.STUDENT_PORTRAIT_BUCKET_ACCESS_KEY ?? '';
@@ -42,10 +39,6 @@ function getS3Client() {
   return cachedS3Client;
 }
 
-// gradeEnum 与 scoreSchema
-// - 用途: 这些 schema 用于约束模型的结构化输出（即 AI 生成的评分内容应满足这些约束）。
-// - 来源: 由本程序定义，模型输出需遵循（structured LLM 输出时验证）。
-// - 注意: scoreSchema 描述的实例（如 process_assessment.score、performance_assessment.overall_score）为 AI 生成结果。
 const gradeEnum = z.enum(['A', 'B', 'C', 'D', 'E']);
 
 const scoreSchema = z.object({
@@ -55,8 +48,6 @@ const scoreSchema = z.object({
   grade: gradeEnum.describe('根据总分映射的等级 A-E'),
   // AI 生成: 对得分的简要解释（必须基于输入证据）
   interpretation: z.string().describe('简要说明评分依据、整体表现'),
-  // AI 生成: 用于支撑判定的证据片段列表（优先引用输入数据）
-  // evidence: z.array(z.string()).describe('支撑该评分的关键证据').default([]),
 });
 
 // 本地截断/摘要长度常量（运行时内部使用）
@@ -71,17 +62,19 @@ type StudentInfo = {
   grasp_level?: string;
   major?: string;
   user_id?: number;
-  // additional_notes?: string;
 };
 
-async function uploadPortraitMarkdownToS3(markdown: string, studentInfo?: StudentInfo) {
+async function uploadPortraitMarkdownToS3(
+  markdown: string,
+  studentInfo?: StudentInfo,
+): Promise<string | undefined> {
   const userId = studentInfo?.user_id;
   if (!userId) {
-    return;
+    return undefined;
   }
 
   const bucket = student_portrait_bucket;
-  const objectKey = String(userId);
+  const objectKey = `${userId}.md`;
 
   const client = getS3Client();
   const command = new PutObjectCommand({
@@ -92,7 +85,8 @@ async function uploadPortraitMarkdownToS3(markdown: string, studentInfo?: Studen
   });
 
   try {
-    await client.send(command);
+    const res = await client.send(command);
+    return res.VersionId;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -123,19 +117,14 @@ type PlanDetailNode = {
 };
 
 // ArtifactAnalysis: 对作品的解析结果，主要由外部解析服务（mineru）或本地处理生成
-// - mineru_payload_* 字段为文档拆解服务返回的元数据（外部服务产物）。
-// - summary 一般为文档拆解服务或后续模型整理出的摘要（AI/服务生成）。
-// - errors 列出调用或解析过程中的异常信息（本地代码填充）。
 type ArtifactAnalysis = {
   file_url: string;
-  // mineru_payload_excerpt?: string;
   mineru_payload_length?: number;
-  // mineru_payload_truncated?: boolean;
   summary: string;
   errors?: string[];
 };
+
 // portraitSchema: 最终学生画像的结构定义（AI 生成的输出应符合此 schema）
-// 说明：portraitSchema 中的 process_assessment / performance_assessment 等均由模型（AI）生成并应满足结构化约束。
 const portraitSchema = z.object({
   overview: z
     .string()
@@ -154,10 +143,6 @@ const portraitSchema = z.object({
             .array(z.string())
             .describe('针对该知识点的改进建议或练习方向')
             .default([]),
-          // evidence: z
-          //   .array(z.string())
-          //   .describe('引用的客观证据，如题目表现、提问记录等')
-          //   .default([]),
         }),
       )
       .describe('针对知识体系中每个节点的掌握情况分析')
@@ -166,21 +151,15 @@ const portraitSchema = z.object({
       mastery: z.object({
         level: z.string().describe('综合掌握度评价结果，需明确等级并说明其含义'),
         interpretation: z.string().describe('对掌握度评价的解释与背后原因'),
-        // evidence: z.array(z.string()).describe('支撑掌握度判断的关键证据').default([]),
       }),
       stability: z.object({
         level: z.string().describe('稳定性水平，如稳定、波动较大等，需要有定性或定量描述'),
         interpretation: z.string().describe('稳定性表现的解析与潜在原因'),
-        // evidence: z
-        //   .array(z.string())
-        //   .describe('支撑稳定性判断的关键证据，例如多次作答的正确率变化、提问波动等')
-        //   .default([]),
         fluctuations: z.array(z.string()).describe('识别到的波动或不稳定环节').default([]),
       }),
       transfer: z.object({
         level: z.string().describe('迁移度水平，如较强/一般/较弱等，需要明确评价标准'),
         interpretation: z.string().describe('对迁移能力的分析，包括在综合或跨知识点题目中的表现'),
-        // evidence: z.array(z.string()).describe('支撑迁移度判断的案例或表现').default([]),
         gaps: z.array(z.string()).describe('迁移过程中暴露出的不足或卡点').default([]),
       }),
     }),
@@ -239,10 +218,8 @@ const portraitSchema = z.object({
 });
 
 // 衍生 schema：用于对不同阶段/环节的 AI 输出进行结构化约束
-// - processAssessmentSchema / performanceAssessmentSchema: 用于约束对应的 AI 输出（由模型生成）
 const processAssessmentSchema = portraitSchema.shape.process_assessment;
 const performanceAssessmentSchema = portraitSchema.shape.performance_assessment;
-// portraitOverviewSchema: 用于生成简短概述（AI 生成）
 const portraitOverviewSchema = z.object({
   overview: z.string().describe('综合过程考查与最终表现后对学生水平与改进重点的 2-3 句总结。'),
 });
@@ -250,11 +227,10 @@ const portraitMarkdownSchema = z.object({
   markdown: z
     .string()
     .describe(
-      '最终呈现给教师或家长的 Markdown 画像，应包含过程考查、最终表现、下一步建议等结构化部分。',
+      '最终呈现给学生的 Markdown 画像，应包含过程考查、最终表现、下一步建议等结构化部分。',
     ),
 });
 
-// Type aliases: 便于在代码中引用这些结构化类型
 // 注意：这些类型大部分对应的是 AI/模型生成的内容（由 structured LLM 输出并用这些 schema 验证）。
 type StudentPortrait = z.infer<typeof portraitSchema>;
 type ProcessAssessment = z.infer<typeof processAssessmentSchema>;
@@ -458,7 +434,6 @@ function formatStudentInfo(info?: StudentInfo): string {
     info.major ? `专业: ${info.major}` : null,
     info.major_background ? `专业背景: ${info.major_background}` : null,
     info.grasp_level ? `自评掌握程度: ${info.grasp_level}` : null,
-    // info.additional_notes ? `补充信息: ${info.additional_notes}` : null,
   ].filter(Boolean);
 
   return parts.length > 0 ? parts.join('； ') : '未提供详细的学生背景。';
@@ -468,31 +443,6 @@ async function summarizePlanDetail(state: typeof chainState.State) {
   const plan_summary = buildPlanSummary(state.plan_detail);
   return { plan_summary };
 }
-
-// function serializeMineruPayload(
-//   payload: unknown,
-//   // maxLength = MINERU_PAYLOAD_EXCERPT_LIMIT,
-// ): { excerpt: string; totalLength: number; truncated: boolean } {
-//   if (payload === null || payload === undefined) {
-//     return { excerpt: '', totalLength: 0, truncated: false };
-//   }
-
-//   let text: string;
-//   if (typeof payload === 'string') {
-//     text = payload;
-//   } else {
-//     try {
-//       text = JSON.stringify(payload, null, 2);
-//     } catch {
-//       text = String(payload);
-//     }
-//   }
-
-//   // const truncated = text.length > maxLength;
-//   // const excerpt = truncated ? truncateText(text, maxLength) : text;
-//   return { excerpt, totalLength: text.length, truncated };
-//   return { excerpt, totalLength: text.length, truncated };
-// }
 
 type MineruTextChunk = {
   text?: string;
@@ -556,9 +506,6 @@ async function callMineruWithImages(file: DownloadedArtifact): Promise<MineruWit
     filename: file.filename,
     contentType: file.contentType,
   });
-  if (mineru_vision_prompt.trim().length > 0) {
-    form.append('prompt', mineru_vision_prompt);
-  }
   if (mineru_vision_provider.trim().length > 0) {
     form.append('provider', mineru_vision_provider);
   }
@@ -580,8 +527,8 @@ async function callMineruWithImages(file: DownloadedArtifact): Promise<MineruWit
     timeout: 300000,
     maxBodyLength: Infinity,
     params: {
-      chunk_type: mineru_chunk_type_flag ? 'true' : 'false',
-      pretty: mineru_pretty_flag ? 'true' : 'false',
+      chunk_type: 'true',
+      pretty: 'true',
     },
   });
 
@@ -626,14 +573,6 @@ function buildArtifactSummary(analyses: ArtifactAnalysis[]): string {
         analysis.errors && analysis.errors.length > 0
           ? `解析异常: ${analysis.errors.join('； ')}`
           : '';
-      // const payloadLine =
-      //   analysis.mineru_payload_excerpt && analysis.mineru_payload_excerpt.trim().length > 0
-      //     ? `原始解析片段${analysis.mineru_payload_truncated ? '（已截断）' : ''}${
-      //         analysis.mineru_payload_length
-      //           ? `，原始长度约 ${analysis.mineru_payload_length} 字符`
-      //           : ''
-      //       }:\n${analysis.mineru_payload_excerpt}`
-      //     : '';
 
       return [
         `解析摘要:\n${analysis.summary || '未获取到有效内容。'}`,
@@ -680,22 +619,13 @@ async function analyzeArtifacts(state: typeof chainState.State) {
     }
 
     const errors: string[] = [];
-    // let mineru_payload_excerpt = '';
     let mineru_payload_length = 0;
-    // let mineru_payload_truncated = false;
     let summary = '';
 
     try {
       const downloadedFile = await downloadArtifactFile(fileUrl);
       const mineruRawPayload = await callMineruWithImages(downloadedFile);
-      // const payloadInfo = serializeMineruPayload(mineruRawPayload);
-      // mineru_payload_excerpt = payloadInfo.excerpt;
-      // mineru_payload_length = payloadInfo.totalLength;
-      // mineru_payload_truncated = payloadInfo.truncated;
       summary = buildMineruSummary(mineruRawPayload);
-      // if (!summary) {
-      //   summary = payloadInfo.excerpt;
-      // }
     } catch (error) {
       errors.push(
         error instanceof Error
@@ -707,13 +637,10 @@ async function analyzeArtifacts(state: typeof chainState.State) {
     if (!summary) {
       summary = '文档拆解服务未返回摘要，可手动检查原始内容。';
     }
-    // summary = truncateText(summary);
 
     analyses.push({
       file_url: fileUrl,
-      // mineru_payload_excerpt: mineru_payload_excerpt || undefined,
       mineru_payload_length: mineru_payload_length || undefined,
-      // mineru_payload_truncated: mineru_payload_truncated || undefined,
       summary,
       errors: errors.length > 0 ? errors : undefined,
     });
@@ -734,7 +661,6 @@ async function assessProcess(state: typeof chainState.State) {
   });
 
   const structuredLlm = model.withStructuredOutput(processAssessmentSchema);
-  // const planDetailJson = JSON.stringify(state.plan_detail ?? [], null, 2);
 
   const process_assessment = await structuredLlm.invoke([
     {
@@ -742,10 +668,11 @@ async function assessProcess(state: typeof chainState.State) {
       content: `你是一位具备教育测评与学习科学背景的教学诊断专家。请根据提供的学习计划、答题表现与互动记录，输出过程考查（process_assessment）结论，并严格遵循给定的 JSON schema。使用时先阅读摘要把握全局指标，再结合 JSON 证据补充细节。需要：
 1. 针对知识体系中每个节点梳理掌握度、优势、问题、改进行动与证据；
 2. 对掌握度、稳定性、迁移度三大维度给出等级判定、解释及支撑证据（如有波动或迁移不足需列出）；
-3. 明确下一步的重点、练习建议与监测指标；
-4. 给出沟通要点或风险提示；
+3. 明确下一步的重点与练习建议（面向学生，避免“监控指标”“常规动作”等表述）；
+4. 给出沟通要点或风险提示（聚焦可执行的短期行动，不涉及“长期监测”“研究跟进”）；
 5. 结合学习投入、完成度、互动与反思等证据，按照提供的评分等级表计算过程考查的 total_score（0-100）与 grade（A-E），并说明评分依据与关键证据。
-请只基于提供的数据，不得臆造。`,
+请只基于提供的数据，不得臆造。
+注意：避免使用“子节点”“母节点”等术语；如需表达层级关系，请使用“知识点”“主题”“分项”等中性表述。`,
     },
     {
       role: 'human',
@@ -777,7 +704,6 @@ async function assessProcess(state: typeof chainState.State) {
 }
 
 async function assessPerformance(state: typeof chainState.State) {
-  // 允许通过环境变量控制 OpenAI 请求超时时间（毫秒），避免长时间阻塞导致的 AbortError
   const openaiTimeoutMs = Number(process.env.OPENAI_TIMEOUT_MS ?? '0');
 
   const model = new ChatOpenAI({
@@ -789,8 +715,6 @@ async function assessPerformance(state: typeof chainState.State) {
   });
 
   const structuredLlm = model.withStructuredOutput(performanceAssessmentSchema);
-  const artifactAnalysisJsonRaw = JSON.stringify(state.artifact_analysis ?? [], null, 2);
-  const artifactAnalysisJson = truncateText(artifactAnalysisJsonRaw, TEXT_SUMMARY_MAX_LENGTH);
   const artifactSummarySafe = truncateText(state.artifact_summary || '', TEXT_SUMMARY_MAX_LENGTH);
 
   try {
@@ -801,7 +725,7 @@ async function assessPerformance(state: typeof chainState.State) {
 要求：
 1. 对每件作品在“内容质量、思维与创新、表达与呈现、规范与反思”四个维度分别给出 0-100 分的量化评分、等级（A-E）与评语；
 2. 结合证据列出作品亮点、问题、改进行动与支撑证据；
-3. 给出整体总结和后续监测建议；
+3. 给出整体总结和面向学生的短期改进行动建议（避免“长期监测”“研究跟进”等表述）；
 4. 严格依据数据，不得编造；
 5. 依据评分等级表计算最终表现的 overall_score（total_score、grade、interpretation），明确综合得分与判定理由。
 评分需参考以下等级说明：
@@ -830,7 +754,6 @@ async function assessPerformance(state: typeof chainState.State) {
     return { performance_assessment };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // 常见：AbortError 或网络层抛出的 "aborted" 字样，通常由超时、连接中断或请求过大引起
     if (/aborted/i.test(message) || (error as any)?.name === 'AbortError') {
       throw new Error(
         `assessPerformance 被中断（aborted）。常见原因：\n- OpenAI 请求超时或被取消（可设置环境变量 OPENAI_TIMEOUT_MS 增大超时）；\n- 上下文过长导致请求过大（已做保护性截断，仍建议减少作品解析长度/数量）；\n- 短时网络中断或对端关闭连接。\n原始错误：${message}`,
@@ -855,8 +778,16 @@ async function generatePortrait(state: typeof chainState.State) {
   });
 
   const structuredOverview = model.withStructuredOutput(portraitOverviewSchema);
-  const processJson = JSON.stringify(process, null, 2);
-  const performanceJson = JSON.stringify(performance, null, 2);
+  const overviewInputPayload = JSON.stringify(
+    {
+      theme: state.theme || '未提供',
+      student_profile: formatStudentInfo(state.student_info),
+      process_assessment: process,
+      performance_assessment: performance,
+    },
+    null,
+    0,
+  );
 
   const overviewResult = await structuredOverview.invoke([
     {
@@ -865,24 +796,8 @@ async function generatePortrait(state: typeof chainState.State) {
     },
     {
       role: 'human',
-      content: `学习主题或课程: ${state.theme || '未提供'}`,
+      content: overviewInputPayload,
     },
-    {
-      role: 'human',
-      content: `学生基础信息（用于理解背景）:\n${formatStudentInfo(state.student_info)}`,
-    },
-    {
-      role: 'human',
-      content: `过程考查结论(JSON，仅结构化明细):\n${processJson}`,
-    },
-    {
-      role: 'human',
-      content: `最终表现结论(JSON，仅结构化明细):\n${performanceJson}`,
-    },
-    // {
-    //   role: 'human',
-    //   content: `宏观指标参考：\n- 学习计划与作答摘要（全局指标）：\n${state.plan_summary || '无'}\n- 最终作品解析摘要（全局表现）：\n${state.artifact_summary || '无'}`,
-    // },
   ]);
 
   const portrait: StudentPortrait = {
@@ -903,35 +818,39 @@ async function renderMarkdown(state: typeof chainState.State) {
 
   const model = new ChatOpenAI({
     apiKey: openai_api_key,
-    modelName: openai_chat_model,
+    modelName: openai_chat_model_mini,
     streaming: false,
   });
 
   const structuredLlm = model.withStructuredOutput(portraitMarkdownSchema);
-  // const portraitJson = JSON.stringify(portrait, null, 2);
+  const markdownInputPayload = JSON.stringify(
+    {
+      theme: state.theme || '未提供',
+      student_profile: formatStudentInfo(state.student_info),
+      overview: portrait.overview,
+      process_assessment: portrait.process_assessment,
+      performance_assessment: portrait.performance_assessment,
+    },
+    null,
+    0,
+  );
 
   const result = await structuredLlm.invoke([
     {
       role: 'system',
-      content: `你是一位教学诊断专家，需要把既定的学生画像内容排版为 Markdown。请严格基于提供的画像 JSON，保持事实一致，输出对象 { "markdown": string }。Markdown 至少包含：
-- “总体概览”段落，用于呈现 portrait.overview；
-- “评分概览”板块，同时列出 process_assessment.score.total_score/grade 与 performance_assessment.overall_score.total_score/grade；
-- “过程考查”“最终表现”两个一级标题，按节点、指标、建议等信息分条说明，可借助列表使结构清晰；
-- “下一步建议”或类似标题，整合 process_assessment.next_steps 与 communication_notes、performance_assessment.monitoring_recommendations。
-禁止增删事实或新编内容，可对表述做轻微润色以便阅读。`,
+   content: `你是一位教学诊断专家，需要把既定的学生画像内容排版为 Markdown。请严格基于输入 JSON，保持事实一致，输出对象 { "markdown": string }。Markdown 必须包含三个部分：
+ - “总体概览”：用 2-3 句话概述 portrait.overview 要点，并用自然语言给出两项评分及等级。例如：“过程性评分：85 分（等级 B）；表现性评分：88 分（等级 B）。”同时补充学生的学习目标或阶段性意向（若输入可支持），并给出基于事实的简短肯定性描述（如坚持、改进意愿、优势表现等，不可臆测）。不要在文本中出现任何字段名或路径（如 process_assessment.score.total_score、performance_assessment.overall_score 等），不要出现“=”“:”这类程序化标注。若某项数据缺失，仅写“未提供”。
+ - “成绩与解读”：围绕过程考查与最终表现的关键结论/问题方向进行分点说明，覆盖掌握度、稳定性、迁移度等主要维度以及最终表现亮点或风险。不要描述“依据/证据来源/数据来源/字段名/schema”等元信息，只呈现客观结论与必要的事实描述。
+  - “下一步建议”：整合 process_assessment.next_steps（priorities、recommended_practices）与 process_assessment.communication_notes，去重后按逻辑分组列出，聚焦学生可立即执行的有限任务与学习策略；禁止出现任何括注或方法性说明（如“按紧急与带动效应排序”“建议按……进行”），仅输出具体建议与要点。若信息缺失，仅写“未提供”。
+ 其他约束：
+ - 输出必须为有效的 Markdown 格式，包含标题、列表等结构化元素，便于阅读与理解；
+ - 严禁输出任何内部变量名、字段路径或 schema 名称；
+ - 不要使用“依据来源”“证据来源”“输入数据未提供XXX”之类表述；缺失项统一写“未提供”；
+ - 禁止新增或删除事实，仅可为可读性进行轻微润色（包括去除括号内的排序/方法说明等元语句）；
+  - 语气客观、中性，允许在事实支撑下作简短肯定性表述；读者为学生，避免“监控指标与常规动作”“长期监测与研究跟进”等表述；
+ - 避免使用“子节点”“母节点”等术语，如需表达层级关系，用“知识点”“主题”“分项”等中性表述。`,
     },
-    {
-      role: 'human',
-      content: `学习主题或课程: ${state.theme || '未提供'}`,
-    },
-    {
-      role: 'human',
-      content: `学生基础信息（只做背景提示，不要展开重述）:\n${formatStudentInfo(state.student_info)}`,
-    },
-    {
-      role: 'human',
-      content: `学生画像:\n${portrait.overview}`,
-    },
+    { role: 'human', content: markdownInputPayload },
   ]);
 
   await uploadPortraitMarkdownToS3(result.markdown, state.student_info);
