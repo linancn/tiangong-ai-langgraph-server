@@ -1,0 +1,187 @@
+version: 1
+layout: repo
+lastReviewedAt: 2026-05-08
+lastReviewedCommit: 171453290f1c1c319e5d9c47af6622d76e6aa9df
+
+catalog:
+  repos:
+    - id: ai-langgraph-server
+      path: .
+      canonicalRepo: linancn/tiangong-ai-langgraph-server
+      entryDoc: AGENTS.md
+      workflowDocs:
+        - docs/agents/repo-validation.md
+      workspaceIntegrationRequired: true
+
+ownership:
+  domains:
+    - id: repo-governance-and-docs
+      paths:
+        include:
+          - AGENTS.md
+          - README.md
+          - .docpact/config.yaml
+          - docs/agents/**
+          - .github/workflows/ai-doc-lint.yml
+      ownerRepo: ai-langgraph-server
+    - id: runtime-and-operator-surface
+      paths:
+        include:
+          - package.json
+          - langgraph.json
+          - tsconfig.json
+          - .nvmrc
+          - src/**
+          - nginx/**
+          - docker-compose.self-hosted.yml
+          - test.http
+      ownerRepo: ai-langgraph-server
+    - id: local-docpact-push-gate
+      paths:
+        include:
+          - .githooks/**
+          - scripts/docpact-gate.sh
+          - scripts/install-git-hooks.sh
+      ownerRepo: ai-langgraph-server
+
+coverage:
+  include:
+    - AGENTS.md
+    - README.md
+    - .docpact/config.yaml
+    - docs/agents/**
+    - .github/workflows/ai-doc-lint.yml
+    - .githooks/**
+    - scripts/docpact-gate.sh
+    - scripts/install-git-hooks.sh
+    - package.json
+    - langgraph.json
+    - tsconfig.json
+    - .nvmrc
+    - src/**
+    - nginx/**
+    - docker-compose.self-hosted.yml
+    - test.http
+  exclude:
+    - .git/**
+    - .docpact/runs/**
+    - node_modules/**
+    - dist/**
+    - build/**
+    - .venv/**
+    - __pycache__/**
+
+freshness:
+  warn_after_commits: 40
+  warn_after_days: 60
+  critical_after_days: 120
+
+routing:
+  intents:
+    repo-docs:
+      paths:
+        - AGENTS.md
+        - README.md
+        - .docpact/config.yaml
+        - docs/agents/**
+        - .github/workflows/ai-doc-lint.yml
+    runtime:
+      paths:
+        - package.json
+        - langgraph.json
+        - tsconfig.json
+        - .nvmrc
+        - src/**
+        - nginx/**
+        - docker-compose.self-hosted.yml
+        - test.http
+    local-docpact-gate:
+      paths:
+        - .githooks/pre-push
+        - scripts/docpact-gate.sh
+        - scripts/install-git-hooks.sh
+    proof:
+      paths:
+        - docs/agents/repo-validation.md
+        - .github/workflows/ai-doc-lint.yml
+        - .githooks/pre-push
+        - scripts/docpact-gate.sh
+        - scripts/install-git-hooks.sh
+    root-integration:
+      paths:
+        - AGENTS.md
+
+docInventory:
+  include:
+    - AGENTS.md
+    - README.md
+    - .docpact/config.yaml
+    - docs/agents/repo-validation.md
+
+repo:
+  id: ai-langgraph-server
+  owner: ai-langgraph-server
+
+rules:
+  - id: ai-langgraph-server-bootstrap-contract
+    scope: repo
+    repo: ai-langgraph-server
+    triggers:
+      - path: AGENTS.md
+        kind: doc-contract
+      - path: .docpact/config.yaml
+        kind: doc-ai-layer
+      - path: docs/agents/repo-validation.md
+        kind: deep-doc
+      - path: .github/workflows/ai-doc-lint.yml
+        kind: automation
+    requiredDocs:
+      - path: AGENTS.md
+        mode: review_or_update
+      - path: .docpact/config.yaml
+        mode: review_or_update
+      - path: docs/agents/repo-validation.md
+        mode: review_or_update
+    reason: Repo entry guidance, machine-readable routing, validation guidance, and PR docpact enforcement must stay aligned.
+  - id: ai-langgraph-server-runtime-contract
+    scope: repo
+    repo: ai-langgraph-server
+    triggers:
+      - path: package.json
+        kind: runtime-or-docs
+      - path: langgraph.json
+        kind: runtime-or-docs
+      - path: tsconfig.json
+        kind: runtime-or-docs
+      - path: .nvmrc
+        kind: runtime-or-docs
+      - path: src/**
+        kind: runtime-or-docs
+      - path: nginx/**
+        kind: runtime-or-docs
+      - path: docker-compose.self-hosted.yml
+        kind: runtime-or-docs
+      - path: test.http
+        kind: runtime-or-docs
+    requiredDocs:
+      - path: AGENTS.md
+        mode: review_or_update
+      - path: docs/agents/repo-validation.md
+        mode: review_or_update
+    reason: Runtime or operator-surface changes must keep repo entry and validation guidance accurate.
+  - id: ai-langgraph-server-local-docpact-push-gate
+    scope: repo
+    repo: ai-langgraph-server
+    triggers:
+      - path: .githooks/pre-push
+        kind: local-git-hook
+      - path: scripts/docpact-gate.sh
+        kind: local-automation
+      - path: scripts/install-git-hooks.sh
+        kind: local-automation
+    requiredDocs:
+      - path: .docpact/config.yaml
+        mode: review_or_update
+      - path: docs/agents/repo-validation.md
+        mode: review_or_update
+    reason: Local push documentation governance gates must stay aligned with repo validation guidance and docpact configuration.
