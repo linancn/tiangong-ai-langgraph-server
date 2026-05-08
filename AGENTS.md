@@ -1,0 +1,45 @@
+---
+title: ai-langgraph-server AI Working Guide
+docType: contract
+scope: repo
+status: active
+authoritative: true
+owner: ai-langgraph-server
+language: en
+whenToUse:
+  - when routing work from the workspace root into this repository
+  - when deciding validation, ownership, or documentation-governance rules
+  - when changing runtime, operator, or local gate behavior
+whenToUpdate:
+  - when repo ownership or runtime boundaries change
+  - when validation or local gate behavior changes
+  - when docpact governance rules change
+checkPaths:
+  - AGENTS.md
+  - README.md
+  - .docpact/config.yaml
+  - docs/agents/**
+  - .github/workflows/ai-doc-lint.yml
+  - .githooks/**
+  - scripts/docpact-gate.sh
+  - scripts/install-git-hooks.sh
+lastReviewedAt: 2026-05-08
+lastReviewedCommit: 171453290f1c1c319e5d9c47af6622d76e6aa9df
+related:
+  - .docpact/config.yaml
+  - docs/agents/repo-validation.md
+---
+
+# ai-langgraph-server AI Working Guide
+
+LangGraph server runtime, agent orchestration, gateway, and local development repository.
+
+## Local Docpact Push Gate
+
+Install the versioned local hook once per checkout:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+The `pre-push` hook runs `scripts/docpact-gate.sh`, which performs strict config validation and `docpact lint --mode enforce` before the push leaves the machine. The default comparison base is `origin/main`. Override it for unusual stacks with `DOCPACT_BASE_REF=<ref>` or `scripts/docpact-gate.sh --base <ref>`. The gate writes its detailed report to a temporary file so normal pushes do not create `.docpact/runs/` artifacts.
