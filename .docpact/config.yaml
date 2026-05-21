@@ -40,6 +40,7 @@ ownership:
       paths:
         include:
           - .githooks/**
+          - scripts/docpact
           - scripts/docpact-gate.sh
           - scripts/install-git-hooks.sh
       ownerRepo: ai-langgraph-server
@@ -52,6 +53,7 @@ coverage:
     - docs/agents/**
     - .github/workflows/ai-doc-lint.yml
     - .githooks/**
+    - scripts/docpact
     - scripts/docpact-gate.sh
     - scripts/install-git-hooks.sh
     - package.json
@@ -98,6 +100,7 @@ routing:
     local-docpact-gate:
       paths:
         - .githooks/pre-push
+        - scripts/docpact
         - scripts/docpact-gate.sh
         - scripts/install-git-hooks.sh
     proof:
@@ -105,6 +108,7 @@ routing:
         - docs/agents/repo-validation.md
         - .github/workflows/ai-doc-lint.yml
         - .githooks/pre-push
+        - scripts/docpact
         - scripts/docpact-gate.sh
         - scripts/install-git-hooks.sh
     root-integration:
@@ -175,6 +179,8 @@ rules:
     triggers:
       - path: .githooks/pre-push
         kind: local-git-hook
+      - path: scripts/docpact
+        kind: local-automation
       - path: scripts/docpact-gate.sh
         kind: local-automation
       - path: scripts/install-git-hooks.sh
